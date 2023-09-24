@@ -1,5 +1,5 @@
 from .models import User
-from .serializers import RegisterUserSerializer
+from .serializers import UserSerializer
 
 from rest_framework import status
 from rest_framework import generics
@@ -29,11 +29,9 @@ class WrapUnwrapDataMixin:
 class RegisterView(WrapUnwrapDataMixin,generics.CreateAPIView):
     wrapper_key = "user"
 
-    queryset = User.objects.all()
+    # queryset = User.objects.all()
     permission_classes = (AllowAny,)
-    serializer_class = RegisterUserSerializer
+    serializer_class = UserSerializer
 
 
 
-
-        
