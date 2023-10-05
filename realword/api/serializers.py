@@ -3,7 +3,7 @@ from rest_framework.authentication import authenticate
 from django.utils.translation import gettext_lazy as _
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User
+from .models import User, FollowingUser
 
 
 def get_tokens_for_user(user):
@@ -60,3 +60,33 @@ class UserSerializer(serializers.ModelSerializer):
         user.set_password(validated_data["password"])
         user.save()
         return user
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    following = serializers.SerializerMethodField("_following")
+
+    def _following(self, obj):
+        user = self.context.get("request").user
+
+        following = FollowingUser.objects.filter(user=user, following=obj).exists()
+
+        if self.context.get("request").method == "POST" and not following:
+            FollowingUser.objects.create(user=user, following=obj)
+
+            return True
+
+        if self.context.get("request").method == "DELETE" and following:
+            FollowingUser.objects.get(user=user, following=obj).delete()
+
+            return False
+
+        return following
+
+    class Meta:
+        model = User
+        fields = ["username", "bio", "image", "following"]
+
+    def to_representation(self, instance):
+        data = super(ProfileSerializer, self).to_representation(instance)
+
+        return {"profile": data}
