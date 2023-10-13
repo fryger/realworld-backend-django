@@ -2,6 +2,7 @@ from django.db import models
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
+from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError
@@ -58,3 +59,26 @@ class FollowingUser(models.Model):
     def clean(self):
         if self.user == self.following:
             raise ValidationError(_("User cannot follows itself"))
+
+
+class Article(models.Model):
+    title = models.CharField(max_length=150)
+    description = models.CharField(max_length=255)
+    body = models.TextField()
+    tagList = models.JSONField(default=list)
+    slug = models.SlugField(unique=True, blank=True)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedAt = models.DateTimeField(auto_now=True)
+    author = models.ForeignKey(User, on_delete=models.PROTECT)
+
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class ArticleFavorited(models.Model):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)

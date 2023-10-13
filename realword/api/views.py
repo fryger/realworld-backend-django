@@ -1,6 +1,11 @@
 from functools import wraps
-from .models import User, FollowingUser
-from .serializers import UserSerializer, LoginSerializer, ProfileSerializer
+from .models import User, FollowingUser, Article
+from .serializers import (
+    UserSerializer,
+    LoginSerializer,
+    ProfileSerializer,
+    ArticleSerializer,
+)
 
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -71,7 +76,7 @@ class UserView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ProfileView(RetrieveModelMixin, GenericAPIView):
+class ProfileView(CreateAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = ProfileSerializer
     lookup_field = "username"
@@ -82,7 +87,9 @@ class ProfileView(RetrieveModelMixin, GenericAPIView):
         return User.objects.get(username=username)
 
     def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"profile": serializer.data})
 
 
 class ProfileFollowView(APIView):
@@ -102,9 +109,33 @@ class ProfileFollowView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(instance=self.get_object())
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"profile": serializer.data}, status=status.HTTP_200_OK)
 
     def delete(self, request, *args, **kwargs):
         serializer = self.get_serializer(instance=self.get_object())
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"profile": serializer.data}, status=status.HTTP_200_OK)
+
+
+class ArticleView(CreateAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ArticleSerializer
+    queryset = Article.objects.all()
+
+    # def get_serializer(self, *args, **kwargs):
+    #     context = {"request": self.request}
+    #     return self.serializer_class(*args, context=context, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        modified_data = request.data.copy().get("article")
+
+        serializer = self.get_serializer(data=modified_data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        return Response(
+            {"article": serializer.data},
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )

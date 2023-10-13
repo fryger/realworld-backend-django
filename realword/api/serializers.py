@@ -3,7 +3,7 @@ from rest_framework.authentication import authenticate
 from django.utils.translation import gettext_lazy as _
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User, FollowingUser
+from .models import User, FollowingUser, Article, ArticleFavorited
 
 
 def get_tokens_for_user(user):
@@ -86,7 +86,47 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = ["username", "bio", "image", "following"]
 
-    def to_representation(self, instance):
-        data = super(ProfileSerializer, self).to_representation(instance)
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
 
-        return {"profile": data}
+    #     return {"profile": data}
+
+
+class ArticleSerializer(serializers.ModelSerializer):
+    author = ProfileSerializer(read_only=True)
+    favorited = serializers.SerializerMethodField("_favorited")
+    favoritesCount = serializers.SerializerMethodField("_count_favorited")
+
+    def _favorited(self, article) -> bool:
+        user = self.context.get("request").user
+
+        favorited = ArticleFavorited.objects.filter(user=user, article=article)
+
+        return bool(favorited)
+
+    def _count_favorited(self, article) -> int:
+        count = ArticleFavorited.objects.filter(article=article).count()
+
+        return count
+
+    class Meta:
+        model = Article
+        fields = [
+            "slug",
+            "title",
+            "description",
+            "body",
+            "tagList",
+            "createdAt",
+            "updatedAt",
+            "favorited",
+            "favoritesCount",
+            "author",
+        ]
+
+    def create(self, validated_data):
+        user = self.context.get("request").user
+
+        validated_data["author"] = user
+
+        return super().create(validated_data)
