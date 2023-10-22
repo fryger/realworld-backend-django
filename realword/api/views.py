@@ -15,7 +15,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.mixins import RetrieveModelMixin, CreateModelMixin
-from rest_framework.generics import GenericAPIView, CreateAPIView, RetrieveAPIView
+from rest_framework.generics import (
+    GenericAPIView,
+    CreateAPIView,
+    RetrieveAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.views import APIView
 
 
@@ -135,7 +140,23 @@ class ArticleView(CreateAPIView):
         headers = self.get_success_headers(serializer.data)
 
         return Response(
-            {"article": serializer.data},
+            serializer.data,
             status=status.HTTP_201_CREATED,
             headers=headers,
         )
+
+
+class ArticleDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+    lookup_field = "slug"
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data["article"], partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)

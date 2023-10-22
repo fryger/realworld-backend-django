@@ -130,3 +130,8 @@ class ArticleSerializer(serializers.ModelSerializer):
         validated_data["author"] = user
 
         return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        return {"article": data}
