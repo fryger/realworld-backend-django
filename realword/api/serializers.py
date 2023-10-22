@@ -102,6 +102,16 @@ class ArticleSerializer(serializers.ModelSerializer):
 
         favorited = ArticleFavorited.objects.filter(user=user, article=article)
 
+        if self.context.get("favorite") and self.context.get("request").method == "POST" and not favorited:
+            ArticleFavorited.objects.create(user=user, article=article)
+            
+            return True
+        
+        if self.context.get("favorite") and self.context.get("request").method == "DELETE" and favorited:
+            ArticleFavorited.objects.get(user=user, article=article).delete()
+
+            return False
+        
         return bool(favorited)
 
     def _count_favorited(self, article) -> int:

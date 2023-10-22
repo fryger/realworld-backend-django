@@ -1,5 +1,5 @@
 from functools import wraps
-from .models import User, FollowingUser, Article
+from .models import User, FollowingUser, Article, ArticleFavorited
 from .serializers import (
     UserSerializer,
     LoginSerializer,
@@ -147,6 +147,7 @@ class ArticleView(CreateAPIView):
 
 
 class ArticleDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = (IsAuthenticated,)
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
     lookup_field = "slug"
@@ -160,3 +161,21 @@ class ArticleDetailView(RetrieveUpdateDestroyAPIView):
         self.perform_update(serializer)
 
         return Response(serializer.data)
+
+
+class ArticleFavoriteView(GenericAPIView, RetrieveModelMixin):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ArticleSerializer
+    queryset = Article.objects.all()
+    lookup_field = "slug"
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["favorite"] = True
+        return context
+
+    def post(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+
+    def delete(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
