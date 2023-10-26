@@ -141,7 +141,7 @@ class ArticleSerializer(serializers.ModelSerializer):
 
         return super().create(validated_data)
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
+    # def to_representation(self, instance):
+    #     data = super().to_representation(instance)
 
-        return {"article": data}
+    #     return {"article": data}

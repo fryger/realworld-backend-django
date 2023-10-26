@@ -11,7 +11,11 @@ from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework import serializers
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.mixins import RetrieveModelMixin, CreateModelMixin
@@ -20,6 +24,7 @@ from rest_framework.generics import (
     CreateAPIView,
     RetrieveAPIView,
     RetrieveUpdateDestroyAPIView,
+    ListAPIView,
 )
 from rest_framework.views import APIView
 
@@ -122,14 +127,57 @@ class ProfileFollowView(APIView):
         return Response({"profile": serializer.data}, status=status.HTTP_200_OK)
 
 
-class ArticleView(CreateAPIView):
-    permission_classes = (IsAuthenticated,)
+class ArticleView(CreateAPIView, ListAPIView, GenericAPIView):
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ArticleSerializer
-    queryset = Article.objects.all()
 
-    # def get_serializer(self, *args, **kwargs):
-    #     context = {"request": self.request}
-    #     return self.serializer_class(*args, context=context, **kwargs)
+    article_limit = 20
+    article_offset = 0
+
+    def get_queryset(self):
+        tag = self.request.GET.get("tag")
+        author = self.request.GET.get("author")
+        favorited = self.request.GET.get("favorited")
+        limit = int(self.request.GET.get("limit", self.article_limit))
+        offset = int(self.request.GET.get("offset", self.article_offset))
+
+        queryset = Article.objects.all()
+
+        if tag:
+            queryset = queryset.filter(tagList__icontains=tag)
+
+        if author:
+            author_obj = User.objects.filter(username=author).first()
+
+            queryset = queryset.filter(author=author_obj)
+
+        if favorited:
+            fav_by_user = User.objects.filter(username=favorited).first()
+
+            favorite_articles = ArticleFavorited.objects.filter(
+                user=fav_by_user
+            ).values("article")
+
+            queryset = queryset.filter(pk__in=favorite_articles)
+
+        queryset = queryset.order_by("-createdAt")
+
+        limited_queryset = queryset[offset : limit + offset]
+
+        queryset_count = limited_queryset.count()
+
+        return limited_queryset, queryset_count
+
+    def get(self, request, *args, **kwargs):
+        queryset, queryset_count = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"articles": serializer.data, "articlesCount": queryset_count})
 
     def post(self, request, *args, **kwargs):
         modified_data = request.data.copy().get("article")
@@ -140,17 +188,22 @@ class ArticleView(CreateAPIView):
         headers = self.get_success_headers(serializer.data)
 
         return Response(
-            serializer.data,
+            {"article": serializer.data},
             status=status.HTTP_201_CREATED,
             headers=headers,
         )
 
 
 class ArticleDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
     lookup_field = "slug"
+
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"article": serializer.data})
 
     def put(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -160,7 +213,7 @@ class ArticleDetailView(RetrieveUpdateDestroyAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        return Response(serializer.data)
+        return Response({"article": serializer.data})
 
 
 class ArticleFavoriteView(GenericAPIView, RetrieveModelMixin):
@@ -175,7 +228,11 @@ class ArticleFavoriteView(GenericAPIView, RetrieveModelMixin):
         return context
 
     def post(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"article": serializer.data})
 
     def delete(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"article": serializer.data})
