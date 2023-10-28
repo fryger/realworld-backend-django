@@ -3,7 +3,7 @@ from rest_framework.authentication import authenticate
 from django.utils.translation import gettext_lazy as _
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User, FollowingUser, Article, ArticleFavorited
+from .models import User, FollowingUser, Article, ArticleFavorited, Comment
 
 
 def get_tokens_for_user(user):
@@ -102,16 +102,24 @@ class ArticleSerializer(serializers.ModelSerializer):
 
         favorited = ArticleFavorited.objects.filter(user=user, article=article)
 
-        if self.context.get("favorite") and self.context.get("request").method == "POST" and not favorited:
+        if (
+            self.context.get("favorite")
+            and self.context.get("request").method == "POST"
+            and not favorited
+        ):
             ArticleFavorited.objects.create(user=user, article=article)
-            
+
             return True
-        
-        if self.context.get("favorite") and self.context.get("request").method == "DELETE" and favorited:
+
+        if (
+            self.context.get("favorite")
+            and self.context.get("request").method == "DELETE"
+            and favorited
+        ):
             ArticleFavorited.objects.get(user=user, article=article).delete()
 
             return False
-        
+
         return bool(favorited)
 
     def _count_favorited(self, article) -> int:
@@ -145,3 +153,22 @@ class ArticleSerializer(serializers.ModelSerializer):
     #     data = super().to_representation(instance)
 
     #     return {"article": data}
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = ProfileSerializer(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ["id", "createdAt", "updatedAt", "body", "author"]
+
+    def create(self, validated_data):
+        user = self.context.get("request").user
+        slug = self.context.get("slug")
+
+        article = Article.objects.get(slug=slug)
+
+        validated_data["author"] = user
+        validated_data["article"] = article
+
+        return super().create(validated_data)

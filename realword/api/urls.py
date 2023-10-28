@@ -7,7 +7,8 @@ from .views import (
     ProfileFollowView,
     ArticleView,
     ArticleDetailView,
-    ArticleFavoriteView
+    ArticleFavoriteView,
+    CommentView,
 )
 
 
@@ -19,5 +20,7 @@ urlpatterns = [
     path("profiles/<str:username>/follow", ProfileFollowView.as_view()),
     path("articles", ArticleView.as_view()),
     path("articles/<str:slug>", ArticleDetailView.as_view()),
-    path("articles/<str:slug>/favorite", ArticleFavoriteView.as_view())
+    path("articles/<str:slug>/favorite", ArticleFavoriteView.as_view()),
+    path("articles/<str:slug>/comments", CommentView.as_view()),
+    path("articles/<str:slug>/comments/<int:id>", CommentView.as_view()),
 ]

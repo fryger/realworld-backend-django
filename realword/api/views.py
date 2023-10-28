@@ -1,10 +1,11 @@
 from functools import wraps
-from .models import User, FollowingUser, Article, ArticleFavorited
+from .models import User, FollowingUser, Article, ArticleFavorited, Comment
 from .serializers import (
     UserSerializer,
     LoginSerializer,
     ProfileSerializer,
     ArticleSerializer,
+    CommentSerializer,
 )
 
 from django.shortcuts import get_object_or_404
@@ -18,7 +19,12 @@ from rest_framework.permissions import (
 )
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.mixins import RetrieveModelMixin, CreateModelMixin
+from rest_framework.mixins import (
+    RetrieveModelMixin,
+    CreateModelMixin,
+    ListModelMixin,
+    DestroyModelMixin,
+)
 from rest_framework.generics import (
     GenericAPIView,
     CreateAPIView,
@@ -236,3 +242,55 @@ class ArticleFavoriteView(GenericAPIView, RetrieveModelMixin):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({"article": serializer.data})
+
+
+class CommentView(GenericAPIView, CreateModelMixin, ListModelMixin, DestroyModelMixin):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CommentSerializer
+    # queryset = Article.objects.all()
+    lookup_field = "id"
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["slug"] = self.kwargs["slug"]
+        return context
+
+    def get_queryset(self):
+        slug = self.kwargs["slug"]
+
+        article = Article.objects.get(slug=slug)
+
+        queryset = article.comment_set.all()
+
+        return queryset
+
+    def get_object(self):
+        return super().get_object()
+
+    def post(self, request, *args, **kwargs):
+        modified_data = request.data.copy().get("comment")
+
+        serializer = self.get_serializer(data=modified_data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        return Response(
+            {"comment": serializer.data},
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"comments": serializer.data})
+
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)

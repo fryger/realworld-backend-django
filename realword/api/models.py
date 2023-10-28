@@ -82,3 +82,12 @@ class Article(models.Model):
 class ArticleFavorited(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
+
+
+class Comment(models.Model):
+    id = models.AutoField(primary_key=True)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedAt = models.DateTimeField(auto_now=True)
+    body = models.CharField(max_length=255)
+    author = models.ForeignKey(User, on_delete=models.PROTECT)
+    article = models.ForeignKey(Article, on_delete=models.CASCADE)
